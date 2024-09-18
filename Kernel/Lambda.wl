@@ -55,6 +55,7 @@ RandomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, n : _Integer | Automat
 (* From Max Niederman *)
 
 (* offset only the free variables in a lambda term *)
+offsetFree[expr_, 0, ___] := expr
 offsetFree[\[FormalLambda][body_], offset_, depth_ : 0] := \[FormalLambda][offsetFree[body, offset, depth + 1]]
 offsetFree[fun_[x_], offset_, depth_ : 0] := offsetFree[fun, offset, depth][offsetFree[x, offset, depth]]
 offsetFree[var_Integer, offset_, depth_ : 0] := If[var > depth, var + offset, var]
@@ -88,45 +89,56 @@ BetaReduce[expr_, n_Integer] := If[ n <= 0, expr,
 
 
 (* substitute all variables *)
-LambdaSubstitute[expr_, vars_Association : <||>, depth_Integer : 0] := If[ Length[vars] == 0,
+LambdaSubstitute[expr_, vars_Association : <||>, offset_Integer : 0, depth_Integer : 0, subDepth_Integer : 0] :=
+	If[ Length[vars] == 0,
 	expr
 	,
 	Replace[expr, {
-		\[FormalLambda][body_] :> \[FormalLambda][LambdaSubstitute[body, vars, depth + 1]],
-		f_[x_] :> LambdaSubstitute[f, vars, depth][LambdaSubstitute[x, vars, depth]],
-		var_Integer :> If[KeyExistsQ[vars, var - depth], offsetFree[Lookup[vars, var - depth], depth + 1], var]
+		\[FormalLambda][body_] :> \[FormalLambda][LambdaSubstitute[body, vars, offset, depth, subDepth + 1]],
+		f_[x_] :> LambdaSubstitute[f, vars, offset, depth, subDepth][LambdaSubstitute[x, vars, offset, depth, subDepth]],
+		var_Integer :> 
+			If[	KeyExistsQ[vars, var - subDepth],
+				(* argument variable substitutution *)
+				offsetFree[Lookup[vars, var - subDepth], subDepth + depth]
+				,
+				(* free or bound variable *)
+				If[	var > subDepth + depth + 1,
+					(* free variable *)
+					var + offset,
+					(* bound variable *)
+					var
+				]
+			]
 	}]
 ]
 
-
-EvalLambda[expr_, vars_Association : <||>, n : _Integer | Infinity : Infinity, k_Integer : 0] := If[ k >= n,
-	With[{subst = LambdaSubstitute[expr, vars]}, Sow[k]; subst]
+(* TODO: non-recursive version *)
+(* this tries to delay substitution *)
+EvalLambda[expr_, vars_Association : <||>, n : _Integer | Infinity : Infinity, k_Integer : 0, offset_Integer : 0, depth_Integer : 0] := If[ k >= n,
+	With[{subst = LambdaSubstitute[expr, vars, offset, depth]}, Sow[k]; subst]
 	,
 	Replace[
 		expr,
 		{
 			(* beta reductions uses argument->head order *)
-			(lambda : \[FormalLambda][body_])[arg_] :> With[{evalArg = Reap[EvalLambda[arg, vars, n, k]]}, {l = evalArg[[2, 1, 1]]},
+			(lambda : \[FormalLambda][body_])[arg_] :> With[{evalArg = Reap[EvalLambda[arg, vars, n, k, offset, depth]]}, {l = evalArg[[2, 1, 1]]},
 				If[ l >= n,
-					With[{subst = LambdaSubstitute[lambda, vars]}, Sow[If[subst === lambda, l, l + 1]]; subst[evalArg[[1]]]]
+					With[{subst = LambdaSubstitute[lambda[evalArg[[1]]], vars, offset, depth]}, Sow[If[subst === lambda, l, l + 1]]; subst]
 					,
-					offsetFree[EvalLambda[body, <|1 -> evalArg[[1]], KeyMap[# + 1 &, vars]|>, n, l + 1], -1]
+					EvalLambda[body, <|1 -> evalArg[[1]], KeyMap[# + 1 &, vars]|>, n, l + 1, offset - 1]
 				]
 			],
-			\[FormalLambda][body_] :> \[FormalLambda][EvalLambda[body, KeyMap[# + 1 &, vars], n, k]],
+			\[FormalLambda][body_] :> \[FormalLambda][EvalLambda[body, KeyMap[# + 1 &, vars], n, k, offset, depth + 1]],
 			(* standard head->argument evaluation order *)
-			head_[arg_] :> With[{evalHead = Reap[EvalLambda[head, vars, n, k]]}, {evalArg = Reap[EvalLambda[arg, vars, n, evalHead[[2, 1, 1]]]]}, {l = evalArg[[2, 1, 1]]},
-				If[ evalHead[[1]][evalArg[[1]]] === head[arg],
-					With[{subst = LambdaSubstitute[head[arg], vars]}, Sow[If[subst === expr, l, l + 1]]; subst],
-					If[ l >= n,
-						With[{subst = LambdaSubstitute[evalHead[[1]][evalArg[[1]]], vars]}, Sow[If[subst === expr, l, l + 1]]; subst]
-						,
-						EvalLambda[evalHead[[1]][evalArg[[1]]], vars, n, l]
-					]
+			head_[arg_] :> With[{evalHead = Reap[EvalLambda[head, vars, n, k, offset, depth]]}, {evalArg = Reap[EvalLambda[arg, vars, n, evalHead[[2, 1, 1]], offset, depth]]}, {l = evalArg[[2, 1, 1]]},
+				If[ l >= n || evalHead[[1]][evalArg[[1]]] === head[arg],
+					Sow[l]; evalHead[[1]][evalArg[[1]]]
+					,
+					EvalLambda[evalHead[[1]][evalArg[[1]]], n, l]
 				]
 			]
 			,
-			_ :> With[{subst = LambdaSubstitute[expr, vars]}, Sow[k]; subst]
+			_ :> With[{subst = LambdaSubstitute[expr, vars, offset, depth]}, Sow[k]; subst]
 		}
 	]
 ]
