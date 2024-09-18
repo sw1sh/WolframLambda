@@ -7,7 +7,7 @@ PacletObject[
     "Creator" -> "Nik Murzin",
     "License" -> "MIT",
     "PublisherID" -> "Wolfram",
-    "Version" -> "1.0.1",
+    "Version" -> "1.0.2",
     "WolframVersion" -> "13.1+",
     "PrimaryContext" -> "Wolfram`Lambda`",
     "DocumentationURL" -> "https://resources.wolframcloud.com/PacletRepository/resources",
@@ -17,7 +17,6 @@ PacletObject[
         "Root" -> "Kernel",
         "Context" -> {"Wolfram`Lambda`"},
         "Symbols" -> {
-          "Wolfram`Lambda`ColorizeLambda",
           "Wolfram`Lambda`EnumerateLambdas",
           "Wolfram`Lambda`EvalLambda",
           "Wolfram`Lambda`BetaReductions",
@@ -26,7 +25,9 @@ PacletObject[
           "Wolfram`Lambda`LambdaFreeVariables",
           "Wolfram`Lambda`FunctionLambda",
           "Wolfram`Lambda`LambdaFunction",
-          "Wolfram`Lambda`RandomLambda"
+          "Wolfram`Lambda`RandomLambda",
+          "Wolfram`Lambda`ColorizeLambda",
+          "Wolfram`Lambda`LambdaSmiles"
         }
       },
       {

@@ -187,6 +187,8 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	"Application",
 	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
+	"Composition" | "SmallCircle",
+	expr //. (f : Except[\[FormalLambda]])[x_] :> SmallCircle[f, x] //. {\[FormalLambda][body_SmallCircle] :> Flatten[body, Infinity, SmallCircle], \[FormalLambda][x_] :> x},
 	"Function",
 	LambdaFunction[expr],
 	_,
