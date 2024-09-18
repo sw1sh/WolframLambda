@@ -27,6 +27,7 @@ FunctionLambda;
 
 TagLambda;
 ColorizeLambda;
+LambdaSmiles;
 
 
 Begin["`Private`"];
@@ -176,6 +177,34 @@ ColorizeTaggedLambda[lambda_] := With[{lambdas = Union @ Cases[lambda, Interpret
 
 ColorizeLambda[expr_] := expr /. lambda_\[FormalLambda] :> ColorizeTaggedLambda[TagLambda[lambda]]
 
+
+LambdaRow[Interpretation["\[Lambda]", tag_][body_], depth_ : 0] := {{\[FormalLambda][tag] -> depth, Splice[LambdaRow[body, depth + 1]]}}
+LambdaRow[Interpretation[i_Integer, tag_], depth_ : 0] := {i -> tag}
+LambdaRow[f_[x_], depth_ : 0] := Join[LambdaRow[f, depth], LambdaRow[x, depth]]
+LambdaRow[x_, depth_ : 0] := {x}
+
+Options[LambdaSmiles] = Join[{"Height" -> 3}, Options[Style], Options[Graphics]];
+LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLambda[lambda]], lambdaPos, varPos, lambdas, vars, colors, arrows, height = OptionValue["Height"], styleOpts = FilterRules[{opts}, Options[Style]]},
+	row = row //. body : {_\[FormalLambda] -> _, __} :> Splice[{"(", Splice[body], ")"}];
+	lambdaPos = Position[row, _\[FormalLambda] -> _, {1}, Heads -> False];
+	varPos = Position[row, _Integer -> _, {1}, Heads -> False];
+	lambdas = AssociationThread[#[[All, 1, 1]], Thread[First /@ lambdaPos -> #[[All, 2]]]] & @ Extract[row, lambdaPos];
+	vars = Extract[row, varPos];
+	colors = Association @ MapIndexed[#1[[1, 1]] -> ColorData[109][#2[[1]]] &, Extract[row, lambdaPos]];
+	row = MapAt[Style["\[Lambda]", colors[#[[1, 1]]]] &, lambdaPos] @ MapAt[Style[#[[1]], colors[#[[2]]]] &, varPos] @ row;
+	
+	arrows = MapThread[With[{dh = Ceiling[#1[[1]] / 2], sign = (-1) ^ Boole[EvenQ[#1[[1]]]], l = lambdas[#1[[2]]]},
+		{colors[#1[[2]]], Line[Threaded[{1, sign}] * {{#2, 1}, {#2, 1 + dh / (l[[2]] + 1)}, {l[[1]], 1 + dh / (l[[2]] + 1)}, {l[[1]], 1}}]}] &,
+		{vars, First /@ varPos}
+	];
+	Graphics[{
+		MapIndexed[Inset[Style[#1, styleOpts, FontSize -> 16], {#2[[1]], 0}] &, row],
+		arrows
+	},
+		FilterRules[{opts}, Options[Graphics]],
+		AspectRatio -> height / Length[row]
+	]
+]
 
 (* ::Section::Closed:: *)
 (*Package Footer*)
