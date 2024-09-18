@@ -16,7 +16,7 @@ EnumerateLambdas;
 
 LambdaSubstitute;
 EvalLambda;
-LambdaFreeVariablePositions;
+LambdaFreeVariables;
 
 BetaReductions;
 BetaReduce;
@@ -24,6 +24,7 @@ EtaReduce;
 
 LambdaFunction;
 FunctionLambda;
+LambdaConvert;
 
 TagLambda;
 ColorizeLambda;
@@ -137,11 +138,12 @@ EtaReduce[expr_, n_Integer] := If[ n <= 0, expr,
 ]
 
 
-LambdaFreeVariablePositions[expr_, pos_List : {}, depth_Integer : 0] :=  Replace[expr, {
-	\[FormalLambda][body_][arg_] :> Join[LambdaFreeVariablePositions[body, Join[pos, {0, 1}], depth + 1], LambdaFreeVariablePositions[arg, Append[pos, 1], depth]],
-	\[FormalLambda][body_] :> LambdaFreeVariablePositions[body, Append[pos, 1], depth + 1],
-	f_[x_] :> Join[LambdaFreeVariablePositions[f, Append[pos, 0], depth], LambdaFreeVariablePositions[x, Append[pos, 1], depth]],
-	var_Integer :> If[var > depth, {pos}, {}]
+LambdaFreeVariables[expr_, pos_List : {}, depth_Integer : 0] := Replace[expr, {
+	\[FormalLambda][body_][arg_] :> Join[LambdaFreeVariables[body, Join[pos, {0, 1}], depth + 1], LambdaFreeVariables[arg, Append[pos, 1], depth]],
+	\[FormalLambda][body_] :> LambdaFreeVariables[body, Append[pos, 1], depth + 1],
+	f_[x_] :> Join[LambdaFreeVariables[f, Append[pos, 0], depth], LambdaFreeVariables[x, Append[pos, 1], depth]],
+	var_Integer :> If[var > depth, {{depth, pos, var}}, {}],
+	_ :> {}
 }
 ]
 
@@ -168,6 +170,16 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 	f_[x_] :> FunctionLambda[Unevaluated[f], vars][FunctionLambda[Unevaluated[x], vars]],
 	var_Symbol :> Lookup[vars, var]
 }]
+
+
+LambdaConvert[expr_, form_ : "Application"] := Switch[form,
+	"Application",
+	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
+	"Function",
+	LambdaFunction[expr],
+	_,
+	Missing[form]
+]
 
 
 ColorizeTaggedLambda[lambda_] := With[{lambdas = Union @ Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
