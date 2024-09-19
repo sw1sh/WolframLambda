@@ -121,16 +121,20 @@ EvalLambda[expr_, vars_Association : <||>, n : _Integer | Infinity : Infinity, k
 		expr,
 		{
 			(* beta reductions uses argument->head order *)
-			(lambda : \[FormalLambda][body_])[arg_] :> With[{evalArg = Reap[EvalLambda[arg, vars, n, k, offset, depth]]}, {l = evalArg[[2, 1, 1]]},
+			(lambda : \[FormalLambda][body_])[arg_] :> With[{evalArg = Reap[EvalLambda[arg, vars, n, k, offset, depth]]},
+				{l = If[MatchQ[evalArg, _TerminatedEvaluation], Return[evalArg, With], evalArg[[2, 1, 1]]]},
 				If[ l >= n,
-					With[{subst = LambdaSubstitute[lambda[evalArg[[1]]], vars, offset, depth]}, Sow[If[subst === lambda, l, l + 1]]; subst]
+					With[{subst = LambdaSubstitute[lambda, vars, offset, depth][evalArg[[1]]]}, Sow[If[subst === lambda, l, l + 1]]; subst]
 					,
-					EvalLambda[body, <|1 -> evalArg[[1]], KeyMap[# + 1 &, vars]|>, n, l + 1, offset - 1]
+					EvalLambda[body, <|1 -> evalArg[[1]], KeyMap[# + 1 &, vars]|>, n, l + 1, -1]
 				]
 			],
 			\[FormalLambda][body_] :> \[FormalLambda][EvalLambda[body, KeyMap[# + 1 &, vars], n, k, offset, depth + 1]],
 			(* standard head->argument evaluation order *)
-			head_[arg_] :> With[{evalHead = Reap[EvalLambda[head, vars, n, k, offset, depth]]}, {evalArg = Reap[EvalLambda[arg, vars, n, evalHead[[2, 1, 1]], offset, depth]]}, {l = evalArg[[2, 1, 1]]},
+			head_[arg_] :> With[
+				{evalHead = Reap[EvalLambda[head, vars, n, k, offset, depth]]},
+				{evalArg = If[MatchQ[evalHead, _TerminatedEvaluation], Return[evalHead, With], Reap[EvalLambda[arg, vars, n, evalHead[[2, 1, 1]], offset, depth]]]},
+				{l = If[MatchQ[evalArg, _TerminatedEvaluation], Return[evalArg, With], evalArg[[2, 1, 1]]]},
 				If[ l >= n || evalHead[[1]][evalArg[[1]]] === head[arg],
 					Sow[l]; evalHead[[1]][evalArg[[1]]]
 					,
