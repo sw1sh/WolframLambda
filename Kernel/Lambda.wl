@@ -24,6 +24,7 @@ EtaReduce;
 
 LambdaFunction;
 FunctionLambda;
+LambdaTree;
 LambdaConvert;
 
 TagLambda;
@@ -176,6 +177,20 @@ TagLambda[expr_, lambdas_Association] := With[{
 TagLambda[\[FormalLambda][body_]] := With[{lambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, lambda[TagLambda[body, <|1 -> lambda|>]]]
 TagLambda[expr_] := expr /. lambda_\[FormalLambda] :> TagLambda[lambda]
 
+SetAttributes[AlphabetString, Listable]
+AlphabetString[0] = ""
+AlphabetString[n_Integer ? NonNegative] := Block[{q, r},
+	{q, r} = QuotientRemainder[n, 26];
+	If[r == 0, (q -= 1; r = 26)];
+	AlphabetString[q] <> FromLetterNumber[r]
+]
+
+TagLambda[expr_, "Alphabet"] := Block[{lambda = TagLambda[expr], vars},
+	vars = Cases[lambda, Interpretation["\[Lambda]", tag_] :> tag, All, Heads -> True];
+	lambda /. MapThread[With[{sym = Unevaluated @@ #2}, #1 :> sym] &, {vars, MakeExpression /@ AlphabetString[Range[Length[vars]]]}]
+]
+ResourceFunction["AddCodeCompletion"]["TagLambda"][None, {"Alphabet"}]
+
 
 LambdaFunction[expr_, head_ : Identity] := head[Evaluate @ TagLambda[expr]] //. {Interpretation["\[Lambda]", x_][body_] :> Function[x, body], Interpretation[_Integer, x_] :> x}
 
@@ -188,6 +203,12 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 }]
 
 
+LambdaTree[lambda_] := ExpressionTree[
+	TagLambda[lambda, "Alphabet"] //. (f : Except[Interpretation["\[Lambda]", _]])[x_] :> Application[f, x] //. Interpretation[_, tag_] :> ToString[Unevaluated[tag]],
+	"Heads", Heads -> False, TreeElementLabel -> TreeCases[Application] -> "@"
+]
+
+
 LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	"Application",
 	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
@@ -197,10 +218,12 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	expr //. (f : Except[\[FormalLambda]])[x_] :> {f, x} //. {\[FormalLambda][body_List] :> Row[{"(", Splice[Flatten[body]], ")"}], \[FormalLambda][x_] :> Row[{"(", x, ")"}]},
 	"Function",
 	LambdaFunction[expr],
+	"Tree",
+	LambdaTree[expr],
 	_,
 	Missing[form]
 ]
-ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function"}]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function", "Tree"}]
 
 
 ColorizeTaggedLambda[lambda_] := With[{lambdas = Union @ Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
