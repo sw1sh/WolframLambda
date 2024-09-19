@@ -199,7 +199,7 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 	Verbatim[Function][var_, body_][x_] :> \[FormalLambda][FunctionLambda[Unevaluated[body], Prepend[vars + 1, var -> 1]]][FunctionLambda[x, vars]],
 	Verbatim[Function][var_, body_] :> \[FormalLambda][FunctionLambda[Unevaluated[body], Prepend[vars + 1, var -> 1]]],
 	f_[x_] :> FunctionLambda[Unevaluated[f], vars][FunctionLambda[Unevaluated[x], vars]],
-	var_Symbol :> Lookup[vars, var]
+	var_Symbol :> Replace[var, vars]
 }]
 
 
