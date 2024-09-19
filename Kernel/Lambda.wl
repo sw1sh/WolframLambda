@@ -226,12 +226,12 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function", "Tree"}]
 
 
-ColorizeTaggedLambda[lambda_] := With[{lambdas = Union @ Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
+ColorizeTaggedLambda[lambda_] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
 	lambda /. MapThread[x : #1 | Interpretation[_Integer, Evaluate @ #1[[2]]] :> Style[x, Bold, #2] &, {lambdas, ColorData[109] /@ Range[Length[lambdas]]}]
 ]
 
 
-ColorizeLambda[expr_] := expr /. lambda_\[FormalLambda] :> ColorizeTaggedLambda[TagLambda[lambda]]
+ColorizeLambda[expr_] := ColorizeTaggedLambda[TagLambda[expr]]
 
 
 LambdaRow[Interpretation["\[Lambda]", tag_][body_], depth_ : 0] := {{\[FormalLambda][tag] -> depth, Splice[LambdaRow[body, depth + 1]]}}
