@@ -224,10 +224,10 @@ LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLamb
 	lambdas = AssociationThread[#[[All, 1, 1]], Thread[First /@ lambdaPos -> #[[All, 2]]]] & @ Extract[row, lambdaPos];
 	vars = Extract[row, varPos];
 	colors = Association @ MapIndexed[#1[[1, 1]] -> ColorData[109][#2[[1]]] &, Extract[row, lambdaPos]];
-	row = MapAt[Style["\[Lambda]", colors[#[[1, 1]]]] &, lambdaPos] @ MapAt[Style[#[[1]], colors[#[[2]]]] &, varPos] @ row;
+	row = MapAt[Style["\[Lambda]", Lookup[colors, #[[1, 1]], Black]] &, lambdaPos] @ MapAt[Style[#[[1]], Lookup[colors, #[[2]], Black]] &, varPos] @ row;
 	
 	arrows = MapThread[With[{dh = Ceiling[#1[[1]] / 2], sign = (-1) ^ Boole[EvenQ[#1[[1]]]], l = lambdas[#1[[2]]]},
-		{colors[#1[[2]]], Line[Threaded[{1, sign}] * {{#2, 1}, {#2, 1 + dh / (l[[2]] + 1)}, {l[[1]], 1 + dh / (l[[2]] + 1)}, {l[[1]], 1}}]}] &,
+		If[MissingQ[l], Nothing, {colors[#1[[2]]], Line[Threaded[{1, sign}] * {{#2, 1}, {#2, 1 + dh / (l[[2]] + 1)}, {l[[1]], 1 + dh / (l[[2]] + 1)}, {l[[1]], 1}}]}]] &,
 		{vars, First /@ varPos}
 	];
 	Graphics[{
