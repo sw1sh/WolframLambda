@@ -192,12 +192,15 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	"Application",
 	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
 	"Composition" | "SmallCircle",
-	expr //. (f : Except[\[FormalLambda]])[x_] :> SmallCircle[f, x] //. {\[FormalLambda][body_SmallCircle] :> Flatten[body, Infinity, SmallCircle], \[FormalLambda][x_] :> x},
+	expr //. (f : Except[\[FormalLambda]])[x_] :> {f, x} //. {\[FormalLambda][body_List] :> Row[{"(", Splice[Riffle[Flatten[body], "\[SmallCircle]"]], ")"}], \[FormalLambda][x_] :> Row[{"(", x, ")"}]},
+	"Parentheses",
+	expr //. (f : Except[\[FormalLambda]])[x_] :> {f, x} //. {\[FormalLambda][body_List] :> Row[{"(", Splice[Flatten[body]], ")"}], \[FormalLambda][x_] :> Row[{"(", x, ")"}]},
 	"Function",
 	LambdaFunction[expr],
 	_,
 	Missing[form]
 ]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function"}]
 
 
 ColorizeTaggedLambda[lambda_] := With[{lambdas = Union @ Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
