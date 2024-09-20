@@ -217,10 +217,8 @@ LambdaTree[lambda_] := ExpressionTree[
 LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	"Application",
 	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
-	"Composition" | "SmallCircle",
-	expr //. (f : Except[\[FormalLambda]])[x_] :> SmallCircle[f, x] //. {\[FormalLambda][body_] :> Row[{"[", body, "]"}]},
-	"Parentheses",
-	expr //. (f : Except[\[FormalLambda]])[x_] :> {f, x} //. {\[FormalLambda][body_List] :> Row[{"(", Splice[Flatten[body]], ")"}], \[FormalLambda][x_] :> Row[{"(", x, ")"}]},
+	"BracketParens",
+	RawBoxes[ToBoxes[LambdaConvert[expr, "Application"]] /. "\[FormalLambda]" | "\[Application]" -> "\[InvisibleSpace]"],
 	"Function",
 	LambdaFunction[expr],
 	"Tree",
@@ -228,7 +226,7 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	_,
 	Missing[form]
 ]
-ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function", "Tree"}]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Tree"}]
 
 
 BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
@@ -251,12 +249,13 @@ ColorizeLambda[expr_] := ColorizeTaggedLambda[TagLambda[expr]]
 
 LambdaRow[Interpretation["\[Lambda]", tag_][body_], depth_ : 0] := {{\[FormalLambda][tag] -> depth, Splice[LambdaRow[body, depth + 1]]}}
 LambdaRow[Interpretation[i_Integer, tag_], depth_ : 0] := {i -> tag}
+LambdaRow[(f : Except[Interpretation["\[Lambda]", _]])[(g : Except[Interpretation["\[Lambda]", _]])[x_]], depth_ : 0] := Append[LambdaRow[f, depth], LambdaRow[g[x], depth]]
 LambdaRow[f_[x_], depth_ : 0] := Join[LambdaRow[f, depth], LambdaRow[x, depth]]
 LambdaRow[x_, depth_ : 0] := {x}
 
 Options[LambdaSmiles] = Join[{"Height" -> 3}, Options[Style], Options[Graphics]];
 LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLambda[lambda]], lambdaPos, varPos, lambdas, vars, colors, arrows, height = OptionValue["Height"], styleOpts = FilterRules[{opts}, Options[Style]]},
-	row = row //. body : {_\[FormalLambda] -> _, __} :> Splice[{"(", Splice[body], ")"}];
+	row = FixedPoint[Replace[#, xs_List :> Splice[{"(", Splice[xs], ")"}], 1] &, row];
 	lambdaPos = Position[row, _\[FormalLambda] -> _, {1}, Heads -> False];
 	varPos = Position[row, _Integer -> _, {1}, Heads -> False];
 	lambdas = AssociationThread[#[[All, 1, 1]], Thread[First /@ lambdaPos -> #[[All, 2]]]] & @ Extract[row, lambdaPos];
