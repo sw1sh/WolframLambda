@@ -176,7 +176,7 @@ TagLambda[expr_, lambdas_Association] := With[{
 	expr /. {
 		\[FormalLambda][body_][y_] :> With[{newLambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, newLambda[TagLambda[body, Prepend[1 -> newLambda] @ nextLambdas]][TagLambda[y, lambdas]]],
 		\[FormalLambda][body_] :> With[{newLambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, newLambda[TagLambda[body, Prepend[1 -> newLambda] @ nextLambdas]]],
-		term_Integer :> Interpretation[term, Evaluate @ lambdas[term][[2]]]
+		term_Integer :> Interpretation[term, Evaluate @ If[KeyExistsQ[lambdas, term], lambdas[term][[2]], Max[Keys[lambdas]]]]
 	}
 ]
 TagLambda[\[FormalLambda][body_]] := With[{lambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, lambda[TagLambda[body, <|1 -> lambda|>]]]
@@ -305,7 +305,11 @@ LambdaDiagram[expr_, depths_Association] := Block[{
 			];
 			w = fw + argw + 1;
 		],
-		Interpretation[_Integer, tag_] :> (
+		Interpretation[var_Integer, depth_Integer] :> (
+			w = 0;
+			lines = {{0, {var - depth, - Max[depths] - 1}}}
+		),
+		Interpretation[_Integer, tag_Symbol] :> (
 			w = 0;
 			lines = {{0, {- Lookup[depths, tag, -1], - Max[depths] - 1}}}
 		),
