@@ -151,9 +151,9 @@ EvalLambda[expr_, vars_Association : <||>, n : _Integer | Infinity : Infinity, k
 ]
 
 
-EtaReduce[expr_] := expr //. \[FormalLambda][(f : Except[_Integer])[1]] :> f
+EtaReduce[expr_] := expr //. \[FormalLambda][(f : Except[_Integer])[1]] :> offsetFree[f, -1]
 EtaReduce[expr_, n_Integer] := If[ n <= 0, expr,
-	With[{pos = FirstPosition[expr, \[FormalLambda][Except[_Integer][1]]]}, If[MissingQ[pos], expr, EtaReduce[ReplaceAt[expr, \[FormalLambda][f_[1]] :> f, pos], n - 1]]]
+	With[{pos = FirstPosition[expr, \[FormalLambda][Except[_Integer][1]]]}, If[MissingQ[pos], expr, EtaReduce[ReplaceAt[expr, \[FormalLambda][f_[1]] :> offsetFree[f, -1], pos], n - 1]]]
 ]
 
 
