@@ -30,6 +30,7 @@ LambdaConvert;
 TagLambda;
 ColorizeLambda;
 LambdaSmiles;
+LambdaDiagram;
 
 
 Begin["`Private`"];
@@ -261,6 +262,61 @@ LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLamb
 		AspectRatio -> height / Length[row]
 	]
 ]
+
+
+Options[LambdaDiagram] = Options[Graphics];
+
+LambdaDiagram[expr_, depths_Association] := Block[{
+	w, lines
+},
+	Replace[expr, {
+		Interpretation["\[Lambda]", tag_][body_] :> (
+			{w, lines} = LambdaDiagram[body, depths];
+			lines = Join[{{{0, w}, - Lookup[depths, tag]}}, lines]
+		),
+		f_[arg_] :> Block[{fw, fh, fLines, argw, argLines, fPos, argPos, fVarx, fVary, argVarx, argVary, y},
+			{fw, fLines} = LambdaDiagram[f, depths];
+			{argw, argLines} = LambdaDiagram[arg, depths];
+			fPos = FirstPosition[fLines, {_, {_, _}}];
+			argPos = FirstPosition[argLines, {_, {_, _}}];
+			{fVarx, fVary} = Extract[fLines, fPos];
+			{argVarx, argVary} = Extract[argLines, argPos];
+			y = Max[fVary[[2]], argVary[[2]]];
+			fLines = ReplacePart[fLines, Join[fPos, {2, 2}] -> y];
+			argLines = ReplacePart[argLines, Join[argPos, {2, 2}] -> y];
+			argLines = # + {fw + 1, 0} & /@ argLines;
+			lines = Join[
+				fLines,
+				{{{fVarx, fw + 1}, y}},
+				argLines
+			];
+			w = fw + argw + 1;
+		],
+		Interpretation[_Integer, tag_] :> (
+			w = 0;
+			lines = {{0, {- Lookup[depths, tag, -1], - Max[depths] - 1}}}
+		),
+		_ :> (
+			w = 0;
+			lines = {{0, {1, - Max[depths] - 1}}}
+		)
+	}];
+	
+	{w, lines}
+]
+
+LambdaDepths[expr_, depth_Integer : 0] := Replace[expr, {
+	Interpretation["\[Lambda]", tag_][body_] :> (Sow[tag -> depth]; LambdaDepths[body, depth + 1]),
+	f_[arg_] :> (LambdaDepths[f, depth]; LambdaDepths[arg, depth])
+}]
+
+LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{lambda = TagLambda[expr], depths, lines},
+	depths = Association @ Reap[LambdaDepths[lambda]][[2]];
+	lines = LambdaDiagram[lambda, depths][[2]];
+
+	Graphics[{Line @* Thread /@ lines, PointSize[Large], Cases[lines, {{x_, _}, y_} :> Point[{x, y}]]}, opts]
+]
+
 
 (* ::Section::Closed:: *)
 (*Package Footer*)
