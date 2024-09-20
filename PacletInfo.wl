@@ -28,7 +28,9 @@ PacletObject[
           "Wolfram`Lambda`RandomLambda",
           "Wolfram`Lambda`ColorizeLambda",
           "Wolfram`Lambda`LambdaSmiles",
-          "Wolfram`Lambda`LambdaDiagram"
+          "Wolfram`Lambda`LambdaDiagram",
+          "Wolfram`Lambda`LambdaConvert",
+          "Wolfram`Lambda`ParseLambda"
         }
       },
       {

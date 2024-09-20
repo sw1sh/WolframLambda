@@ -26,6 +26,7 @@ LambdaFunction;
 FunctionLambda;
 LambdaTree;
 LambdaConvert;
+ParseLambda;
 
 TagLambda;
 ColorizeLambda;
@@ -225,6 +226,16 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	Missing[form]
 ]
 ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Composition", "SmallCircle", "Parentheses", "Function", "Tree"}]
+
+
+BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
+
+ParseLambda[str_String, vars_Association : <||>] := First @ StringCases[str, {
+	"\[Lambda]" ~~ var : WordCharacter .. ~~ "." ~~ body__ :> \[FormalLambda][ParseLambda[body, <|vars + 1, var -> 1|>]],
+	f__ ~~ WhitespaceCharacter .. ~~ x__ /; BalancedParenthesesQ[f] :> ParseLambda[f, vars][ParseLambda[x, vars]],
+	"(" ~~ term__ ? BalancedParenthesesQ ~~ ")" :> ParseLambda[term, vars],
+	var : WordCharacter .. :> Replace[var, vars]
+}]
 
 
 ColorizeTaggedLambda[lambda_] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
