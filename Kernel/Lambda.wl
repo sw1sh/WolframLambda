@@ -48,10 +48,13 @@ EnumerateLambdas[maxDepth_Integer : 2, maxLength_Integer : 2, depth_Integer : 1]
 	]
 
 
-randomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, depth_Integer : 1] := \[FormalLambda] @ If[ depth == maxDepth,
-	Fold[Construct, RandomInteger[{1, depth}, RandomInteger[{1, maxLength}]]],
-	Fold[Construct, Table[randomLambda[maxDepth, maxLength, depth + 1], RandomInteger[{1, maxLength}]]]
+randomGrouping[xs_List] := Replace[xs, {{x_} :> x, {x_, y_} :> x[y], {x_, y_, z__} :> If[RandomReal[] < .5, x[randomGrouping[{y, z}]], x[y][randomGrouping[{z}]]]}]
+
+randomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, depth_Integer : 1] := If[ depth == maxDepth,
+	With[{lambdaQ = RandomReal[] < .5}, If[lambdaQ, \[FormalLambda], Identity] @ randomGrouping @ RandomInteger[{1, If[lambdaQ, depth, depth - 1]}, RandomInteger[{1, maxLength}]]],
+	\[FormalLambda] @ randomGrouping @ Table[randomLambda[maxDepth, maxLength, depth + 1], RandomInteger[{1, maxLength}]]
 ]
+
 RandomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, n : _Integer | Automatic : Automatic] := If[n === Automatic, randomLambda[maxDepth, maxLength], Table[randomLambda[maxDepth, maxLength], n]]
 
 
