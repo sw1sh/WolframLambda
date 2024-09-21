@@ -22,6 +22,9 @@ BetaReductions;
 BetaReduce;
 EtaReduce;
 
+LambdaCombinator;
+CombinatorLambda;
+
 LambdaFunction;
 FunctionLambda;
 LambdaTree;
@@ -160,6 +163,41 @@ EtaReduce[expr_, n_Integer] := If[ n <= 0, expr,
 ]
 
 
+LambdaCombinator[expr_, ruleSpec_String : "SK"] := Block[{T, rules = Characters[ruleSpec]},
+	T[x_] := x;
+	T[(f : Except[Interpretation["\[Lambda]", _]])[x_]] := T[f][T[x]];
+	T[Interpretation["\[Lambda]", tag_][x_]] /; FreeQ[x, tag] := CombinatorK[T[x]];
+	T[(l : Interpretation["\[Lambda]", tag_])[y : Interpretation["\[Lambda]", _][x_]]] /; ! FreeQ[x, tag] := T[l[T[y]]];
+
+	T[Interpretation["\[Lambda]", tag_][Interpretation[_, tag_]]] := Evaluate[
+		If[ MemberQ[rules, "I"],
+			CombinatorI,
+			CombinatorS[CombinatorK][CombinatorK]
+		]
+	];
+	If[ MemberQ[rules, "\[Eta]"],
+		T[Interpretation["\[Lambda]", tag_][f_[Interpretation[_, tag_]]]] /; FreeQ[f, tag] := T[f]
+	];
+	If[ MemberQ[rules, "C"],
+		T[(l : Interpretation["\[Lambda]", tag_])[(f : Except[Interpretation["\[Lambda]", _]])[x_]]] /; ! FreeQ[f, tag] && FreeQ[x, tag] := CombinatorC[T[l[f]]][T[x]]
+	];
+	If[ MemberQ[rules, "B"],
+		T[(l : Interpretation["\[Lambda]", tag_])[(f : Except[Interpretation["\[Lambda]", _]])[x_]]] /; FreeQ[f, tag] && ! FreeQ[x, tag] := CombinatorB[T[f]][T[l[x]]]
+	];
+	T[(l : Interpretation["\[Lambda]", tag_])[(f : Except[Interpretation["\[Lambda]", _]])[x_]]] /; ! FreeQ[f, tag] || ! FreeQ[x, tag] := CombinatorS[T[l[f]]][T[l[x]]];
+
+	T[TagLambda[expr]]
+]
+
+CombinatorLambda[expr_] := expr //. {
+	CombinatorI -> \[FormalLambda][1],
+	CombinatorK -> \[FormalLambda][\[FormalLambda][2]],
+	CombinatorS -> \[FormalLambda][\[FormalLambda][\[FormalLambda][3[1][2[1]]]]],
+	CombinatorC -> \[FormalLambda][\[FormalLambda][\[FormalLambda][3[1][2]]]],
+	CombinatorB -> \[FormalLambda][\[FormalLambda][\[FormalLambda][3[2[1]]]]]
+}
+
+
 LambdaFreeVariables[expr_, pos_List : {}, depth_Integer : 0] := Replace[expr, {
 	\[FormalLambda][body_][arg_] :> Join[LambdaFreeVariables[body, Join[pos, {0, 1}], depth + 1], LambdaFreeVariables[arg, Append[pos, 1], depth]],
 	\[FormalLambda][body_] :> LambdaFreeVariables[body, Append[pos, 1], depth + 1],
@@ -221,12 +259,14 @@ LambdaConvert[expr_, form_ : "Application"] := Switch[form,
 	RawBoxes[ToBoxes[LambdaConvert[expr, "Application"]] /. "\[FormalLambda]" | "\[Application]" -> "\[InvisibleSpace]"],
 	"Function",
 	LambdaFunction[expr],
+	"Combinator",
+	LambdaCombinator[expr],
 	"Tree",
 	LambdaTree[expr],
 	_,
 	Missing[form]
 ]
-ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Tree"}]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Combinator", "Tree"}]
 
 
 BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
