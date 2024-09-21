@@ -25,6 +25,7 @@ PacletObject[
           "Wolfram`Lambda`LambdaFreeVariables",
           "Wolfram`Lambda`FunctionLambda",
           "Wolfram`Lambda`LambdaFunction",
+          "Wolfram`Lambda`LambdaCombinator",
           "Wolfram`Lambda`RandomLambda",
           "Wolfram`Lambda`ColorizeLambda",
           "Wolfram`Lambda`LambdaSmiles",
