@@ -282,7 +282,7 @@ BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, E
 
 ParseLambda[str_String, vars_Association : <||>] := First @ StringCases[str, {
 	"\[Lambda]" ~~ var : WordCharacter .. ~~ "." ~~ body__ :> \[FormalLambda][ParseLambda[body, <|vars + 1, var -> 1|>]],
-	f__ ~~ WhitespaceCharacter .. ~~ x__ /; BalancedParenthesesQ[f] :> ParseLambda[f, vars][ParseLambda[x, vars]],
+	f__ ~~ (WhitespaceCharacter | "(") .. ~~ x__ /; BalancedParenthesesQ[f] :> ParseLambda[f, vars][ParseLambda[x, vars]],
 	"(" ~~ term__ ? BalancedParenthesesQ ~~ ")" :> ParseLambda[term, vars],
 	var : WordCharacter .. :> Replace[var, vars]
 }]
