@@ -25,6 +25,9 @@ EtaReduce;
 LambdaCombinator;
 CombinatorLambda;
 
+LambdaApplication;
+LambdaBrackets;
+
 LambdaFunction;
 FunctionLambda;
 LambdaTree;
@@ -253,18 +256,22 @@ LambdaTree[lambda_] := ExpressionTree[
 	"Heads", Heads -> False, TreeElementLabel -> TreeCases[Application] -> "@"
 ]
 
+LambdaApplication[lambda_, ___] := lambda //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x]
 
-LambdaConvert[expr_, form_ : "Application"] := Switch[form,
+LambdaBrackets[lambda_, ___] := RawBoxes[ToBoxes[LambdaApplication[lambda]] /. "\[FormalLambda]" | "\[Application]" -> "\[InvisibleSpace]"]
+
+
+LambdaConvert[expr_, form_String : "Application", args___] := Switch[form,
 	"Application",
-	expr //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x],
+	LambdaApplication[expr],
 	"BracketParens",
-	RawBoxes[ToBoxes[LambdaConvert[expr, "Application"]] /. "\[FormalLambda]" | "\[Application]" -> "\[InvisibleSpace]"],
+	LmabdaBrackets[expr],
 	"Function",
-	LambdaFunction[expr],
+	LambdaFunction[expr, args],
 	"Combinator",
-	LambdaCombinator[expr],
+	LambdaCombinator[expr, args],
 	"Tree",
-	LambdaTree[expr],
+	LambdaTree[expr, args],
 	_,
 	Missing[form]
 ]
