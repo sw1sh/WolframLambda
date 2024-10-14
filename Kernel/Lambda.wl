@@ -217,8 +217,7 @@ TagLambda[expr_, lambdas_Association] := With[{
 		term_Integer :> Interpretation[term, Evaluate @ If[KeyExistsQ[lambdas, term], lambdas[term][[2]], Max[Keys[lambdas]]]]
 	}
 ]
-TagLambda[\[FormalLambda][body_]] := With[{lambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, lambda[TagLambda[body, <|1 -> lambda|>]]]
-TagLambda[expr_] := expr /. lambda_\[FormalLambda] :> TagLambda[lambda]
+TagLambda[\[FormalLambda][body_], "Unique"] := With[{lambda = Interpretation["\[Lambda]", Evaluate[Unique["\[Lambda]"]]]}, lambda[TagLambda[body, <|1 -> lambda|>]]]
 
 SetAttributes[AlphabetString, Listable]
 AlphabetString[0] = ""
@@ -228,14 +227,17 @@ AlphabetString[n_Integer ? NonNegative] := Block[{q, r},
 	AlphabetString[q] <> FromLetterNumber[r]
 ]
 
-TagLambda[expr_, "Alphabet"] := Block[{lambda = TagLambda[expr], vars},
+TagLambda[expr_, "Alphabet"] := Block[{lambda = TagLambda[expr, "Unique"], vars},
 	vars = Cases[lambda, Interpretation["\[Lambda]", tag_] :> tag, All, Heads -> True];
 	lambda /. MapThread[With[{sym = Unevaluated @@ #2}, #1 :> sym] &, {vars, MakeExpression /@ AlphabetString[Range[Length[vars]]]}]
 ]
-ResourceFunction["AddCodeCompletion"]["TagLambda"][None, {"Alphabet"}]
+
+TagLambda[expr_] := expr /. lambda_\[FormalLambda] :> TagLambda[lambda, "Alphabet"]
+
+ResourceFunction["AddCodeCompletion"]["TagLambda"][None, {"Alphabet", "Unique"}]
 
 
-LambdaFunction[expr_, head_ : Identity] := head[Evaluate @ TagLambda[expr]] //. {Interpretation["\[Lambda]", x_][body_] :> Function[x, body], Interpretation[_Integer, x_] :> x}
+LambdaFunction[expr_, head_ : Identity] := head[Evaluate @ TagLambda[expr, "Alphabet"]] //. {Interpretation["\[Lambda]", x_][body_] :> Function[x, body], Interpretation[_Integer, x_] :> x}
 
 
 FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
