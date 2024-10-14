@@ -27,6 +27,7 @@ CombinatorLambda;
 
 LambdaApplication;
 LambdaBrackets;
+LambdaString;
 
 LambdaFunction;
 FunctionLambda;
@@ -264,6 +265,12 @@ LambdaApplication[lambda_, ___] := lambda //. (f : Except[\[FormalLambda]])[x_] 
 
 LambdaBrackets[lambda_, ___] := RawBoxes[ToBoxes[LambdaApplication[lambda]] /. "\[FormalLambda]" | "\[Application]" -> "\[InvisibleSpace]"]
 
+LambdaString[lambda_, ___] := TagLambda[lambda] //. {
+   	Interpretation["\[Lambda]", var_][body_] :> StringTemplate["(\[Lambda]``.``)"][ToString[Unevaluated[var]], LambdaString[body]],
+	Interpretation[_, var_] :> ToString[Unevaluated[var]],
+	f_[x_] :> StringTemplate["(`` ``)"][LambdaString[f], LambdaString[x]]
+}
+
 
 LambdaConvert[expr_, form_String : "Application", args___] := Switch[form,
 	"Application",
@@ -276,10 +283,12 @@ LambdaConvert[expr_, form_String : "Application", args___] := Switch[form,
 	LambdaCombinator[expr, args],
 	"Tree",
 	LambdaTree[expr, args],
+	"String",
+	LambdaString[expr, args],
 	_,
 	Missing[form]
 ]
-ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Combinator", "Tree"}]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Combinator", "Tree", "String"}]
 
 
 BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
