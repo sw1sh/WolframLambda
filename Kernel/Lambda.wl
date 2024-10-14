@@ -362,7 +362,7 @@ LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLamb
 Options[LambdaDiagram] = Join[{"Dynamic" -> False, "Extend" -> False, "Pad" -> True, "Dots" -> True}, Options[Graphics]];
 
 LambdaDiagram[expr_, depths_Association, extend_ ? BooleanQ, pad_ ? BooleanQ, pos_List : {}] := Block[{
-	w, h, lines
+	w, h, lines, dh = Max[depths, -1] + Which[! extend && ! pad, 2, ! pad, 1, True, 0]
 },
 	h = If[extend, 0, -1];
 	Replace[expr, {
@@ -373,15 +373,20 @@ LambdaDiagram[expr_, depths_Association, extend_ ? BooleanQ, pad_ ? BooleanQ, po
 		f_[arg_] :> Block[{fw, fLines, argw, argLines, fPos, argPos, fVarx, fVary, argVarx, argVary},
 			{fw, fLines} = LambdaDiagram[f, If[pad, depths, KeyTake[depths, Cases[f, Interpretation[_, tag_] :> tag, All, Heads -> True]]], extend, pad, Append[pos, 0]];
 			{argw, argLines} = LambdaDiagram[arg, If[pad, depths, KeyTake[depths, Cases[arg, Interpretation[_, tag_] :> tag, All, Heads -> True]]], extend, pad, Append[pos, 1]];
-			fPos = Position[fLines, Labeled[_, _ -> "Application"]];
-			If[	fPos === {},
+			fPos = Position[fLines, Labeled[_, _ -> "LambdaApplication" | "Application"]];
+			If[	! extend || fPos === {},
 				fPos = Append[1] @ FirstPosition[fLines, Labeled[{_, {_, _}}, _]]
 				,
-				fPos = Append[1] @ FirstPosition[fLines, Labeled[{TakeSmallestBy[Extract[fLines, fPos], #[[1, 2]] &, 1][[1, 1, 1, 2]], {_, _}}, _]]
+				fPos = Append[1] @ FirstPosition[fLines, Labeled[{SortBy[Extract[fLines, fPos], {#[[1, 2]], -#[[1, 1, 2]]} &][[1, 1, 1, 2]], {_, _}}, _]]
 			];
 			{fVarx, fVary} = Extract[fLines, fPos];
 			fVary = fVary[[2]];
-			argPos = Append[1] @ FirstPosition[argLines, Labeled[{_, {_, _}}, _]];
+			argPos = Position[argLines, Labeled[_, _ -> "LambdaApplication" | "Application"]];
+			If[	! extend || argPos === {},
+				argPos = Append[1] @ FirstPosition[argLines, Labeled[{_, {_, _}}, _]]
+				,
+				argPos = Append[1] @ FirstPosition[argLines, Labeled[{SortBy[Extract[argLines, argPos], {#[[1, 2]], #[[1, 1, 1]]} &][[1, 1, 1, 1]], {_, _}}, _]]
+			];
 			{argVarx, argVary} = Extract[argLines, argPos];
 			h += If[ extend,
 				Min[fVary, argVary[[2]]] - 1,
@@ -392,21 +397,21 @@ LambdaDiagram[expr_, depths_Association, extend_ ? BooleanQ, pad_ ? BooleanQ, po
 			argLines = Replace[argLines, Labeled[line_, label_] :> Labeled[line + {fw + 1, 0}, label], 1];
 			lines = Join[
 				fLines,
-				{Labeled[{{fVarx, fw + 1}, h}, pos -> If[MatchQ[f, Interpretation["\[Lambda]", _][_]], "LambdaApplication", "Application"]]},
+				{Labeled[{{fVarx, fw + argVarx + 1}, h}, pos -> If[MatchQ[f, Interpretation["\[Lambda]", _][_]], "LambdaApplication", "Application"]]},
 				argLines
 			];
 			w = fw + argw + 1;
 		],
 		Interpretation[var_Integer, depth_Integer] :> (
-			w = 0; h -= Max[depths, -1];
+			w = 0; h -= dh;
 			lines = {Labeled[{0, {var - depth, h}}, pos -> "FreeVariable"]}
 		),
 		Interpretation[_Integer, tag_Symbol] :> (
-			w = 0; h -= Max[depths, -1];
+			w = 0; h -= dh;
 			lines = {Labeled[{0, {- Lookup[depths, tag, -1], h}}, pos -> "Variable"]}
 		),
 		_ :> (
-			w = 0; h -= Max[depths, -1];
+			w = 0; h -= dh;
 			lines = {Labeled[{0, {1, h}}, pos -> "Constant"]}
 		)
 	}];
