@@ -251,10 +251,14 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 }]
 
 
-LambdaTree[lambda_] := ExpressionTree[
-	TagLambda[lambda, "Alphabet"] //. (f : Except[Interpretation["\[Lambda]", _]])[x_] :> Application[f, x] //. Interpretation[_, tag_] :> ToString[Unevaluated[tag]],
-	"Heads", Heads -> False, TreeElementLabel -> TreeCases[Application] -> "@"
+LambdaTree[lambda_, opts___] := ExpressionTree[
+	TagLambda[lambda] //. (f : Except[Interpretation["\[Lambda]", _]])[x_] :> Application[f, x] //. Interpretation[_, tag_] :> ToString[Unevaluated[tag]],
+	"Heads", opts, Heads -> False, 
+	TreeElementLabel -> TreeCases[Application] -> None, 
+	TreeElementStyle -> {TreeCases[Application] -> LightGray, "Leaves" -> LightYellow, _ -> LightRed}, 
+	TreeElementShapeFunction -> TreeCases[Application] -> None
 ]
+
 
 LambdaApplication[lambda_, ___] := lambda //. (f : Except[\[FormalLambda]])[x_] :> Application[f, x]
 
