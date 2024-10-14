@@ -284,12 +284,32 @@ ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "Br
 
 BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
 
-ParseLambda[str_String, vars_Association : <||>] := First @ StringCases[str, {
-	"\[Lambda]" ~~ var : WordCharacter .. ~~ "." ~~ body__ :> \[FormalLambda][ParseLambda[body, <|vars + 1, var -> 1|>]],
-	f__ ~~ (WhitespaceCharacter | "(") .. ~~ x__ /; BalancedParenthesesQ[f] :> ParseLambda[f, vars][ParseLambda[x, vars]],
-	"(" ~~ term__ ? BalancedParenthesesQ ~~ ")" :> ParseLambda[term, vars],
+ParseVariableLambda[str_String, vars_Association : <||>] := First @ StringCases[str, {
+	WhitespaceCharacter ... ~~ "\[Lambda]" ~~ WhitespaceCharacter ... ~~ var : WordCharacter .. ~~ WhitespaceCharacter ... ~~ "." ~~ WhitespaceCharacter ... ~~ body__ :>
+		\[FormalLambda][ParseVariableLambda[body, <|vars + 1, var -> 1|>]],
+	f__ ~~ WhitespaceCharacter ... ~~ x__ /; ! StringMatchQ[x, WhitespaceCharacter ..] && BalancedParenthesesQ[f] && BalancedParenthesesQ[x] :>
+		ParseVariableLambda[f, vars][ParseVariableLambda[x, vars]],
+	"(" ~~ term__ ? BalancedParenthesesQ ~~ ")" :> ParseVariableLambda[term, vars],
 	var : WordCharacter .. :> Replace[var, vars]
 }]
+
+ParseIndexLambda[str_String] := First @ StringCases[str, {
+	WhitespaceCharacter ... ~~ "\[Lambda]" ~~ WhitespaceCharacter ... ~~ body__ ~~ WhitespaceCharacter ... :> \[FormalLambda][ParseIndexLambda[body]],
+	f__ ~~ WhitespaceCharacter .. ~~ x__ /; BalancedParenthesesQ[f] && BalancedParenthesesQ[x] :> ParseIndexLambda[f][ParseIndexLambda[x]],
+	WhitespaceCharacter ... ~~ "(" ~~ term__ ? BalancedParenthesesQ ~~ ")" ~~ WhitespaceCharacter ... :> ParseIndexLambda[term],
+	WhitespaceCharacter ... ~~ var : DigitCharacter .. ~~ WhitespaceCharacter ... :> Interpreter["Integer"][var]
+}]
+
+ParseLambda[str_String, form_String : "Variables"] := Switch[form,
+	"Variables",
+	ParseVariableLambda[str],
+	"Indices",
+	ParseIndexLambda[str],
+	_,
+	Missing[form]
+]
+
+ResourceFunction["AddCodeCompletion"]["ParseLambda"][None, {"Variables", "Indices"}]
 
 
 ColorizeTaggedLambda[lambda_] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
