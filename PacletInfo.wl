@@ -18,6 +18,8 @@ PacletObject[
         "Context" -> {"Wolfram`Lambda`"},
         "Symbols" -> {
           "Wolfram`Lambda`EnumerateLambdas",
+          "Wolfram`Lambda`RandomLambda",
+          "Wolfram`Lambda`RandomSizeLambda",
           "Wolfram`Lambda`EvalLambda",
           "Wolfram`Lambda`BetaReductions",
           "Wolfram`Lambda`BetaReduce",
@@ -26,7 +28,6 @@ PacletObject[
           "Wolfram`Lambda`FunctionLambda",
           "Wolfram`Lambda`LambdaFunction",
           "Wolfram`Lambda`LambdaCombinator",
-          "Wolfram`Lambda`RandomLambda",
           "Wolfram`Lambda`ColorizeLambda",
           "Wolfram`Lambda`LambdaSmiles",
           "Wolfram`Lambda`LambdaDiagram",

@@ -12,6 +12,7 @@ BeginPackage["Wolfram`Lambda`"];
 
 
 RandomLambda;
+RandomSizeLambda;
 EnumerateLambdas;
 
 LambdaSubstitute;
@@ -62,7 +63,16 @@ randomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, depth_Integer : 1] := 
 	\[FormalLambda] @ randomGrouping @ Table[randomLambda[maxDepth, maxLength, depth + 1], RandomInteger[{1, maxLength}]]
 ]
 
+
 RandomLambda[maxDepth_Integer : 2, maxLength_Integer : 2, n : _Integer | Automatic : Automatic] := If[n === Automatic, randomLambda[maxDepth, maxLength], Table[randomLambda[maxDepth, maxLength], n]]
+
+
+randomSizeLambda[head_[arg_], depth_Integer : 0] := With[{headLambda = If[AtomQ[head], RandomChoice[Prepend[\[FormalLambda]] @ Range[depth]], randomSizeLambda[head, depth]]},
+	headLambda[If[AtomQ[arg], If[depth > 0, RandomChoice[Range[depth]], \[FormalLambda][1]], randomSizeLambda[arg, depth + If[headLambda === \[FormalLambda], 1, 0]]]]
+]
+
+RandomSizeLambda[size_Integer, n : _Integer | Automatic : Automatic] /; size > 1 :=
+	If[n === Automatic, randomSizeLambda[randomGrouping[Range[size]]], Table[randomSizeLambda[randomGrouping[Range[size]]], n]]
 
 
 (* From Max Niederman *)
