@@ -23,6 +23,7 @@ PacletObject[
           "Wolfram`Lambda`EvalLambda",
           "Wolfram`Lambda`BetaReductions",
           "Wolfram`Lambda`BetaReduce",
+          "Wolfram`Lambda`BetaReduceList",
           "Wolfram`Lambda`EtaReduce",
           "Wolfram`Lambda`LambdaFreeVariables",
           "Wolfram`Lambda`FunctionLambda",

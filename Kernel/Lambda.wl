@@ -21,6 +21,7 @@ LambdaFreeVariables;
 
 BetaReductions;
 BetaReduce;
+BetaReduceList;
 EtaReduce;
 
 LambdaCombinator;
@@ -109,6 +110,8 @@ BetaReduce[expr_] := expr //. \[FormalLambda][body_][arg_] :> betaSubstitute[bod
 BetaReduce[expr_, n_Integer] := If[ n <= 0, expr,
 	With[{pos = FirstPosition[expr, \[FormalLambda][_][_]]}, If[MissingQ[pos], expr, BetaReduce[ReplaceAt[expr, \[FormalLambda][body_][arg_] :> betaSubstitute[body, arg], pos], n - 1]]]
 ]
+
+BetaReduceList[expr_, n_Integer : Infinity] := Most[FixedPointList[BetaReduce[#, 1] &, expr, n]]
 
 
 (* substitute all variables *)
