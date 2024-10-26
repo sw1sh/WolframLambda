@@ -244,9 +244,9 @@ AlphabetString[n_Integer ? NonNegative] := Block[{q, r},
 	AlphabetString[q] <> FromLetterNumber[r]
 ]
 
-TagLambda[expr_, "Alphabet"] := Block[{lambda = TagLambda[expr, "Unique"], vars},
+TagLambda[expr_, symbols : _List | Automatic | "Alphabet"] := Block[{lambda = TagLambda[expr, "Unique"], vars},
 	vars = Cases[lambda, Interpretation["\[Lambda]", tag_] :> tag, All, Heads -> True];
-	lambda /. MapThread[With[{sym = Unevaluated @@ #2}, #1 :> sym] &, {vars, MakeExpression /@ AlphabetString[Range[Length[vars]]]}]
+	lambda /. MapThread[With[{sym = Unevaluated @@ #2}, #1 :> sym] &, {vars, Replace[symbols, "Alphabet" | Automatic :> MakeExpression /@ AlphabetString[Range[Length[vars]]]]}]
 ]
 
 TagLambda[expr_, form_String : "Alphabet"] := expr /. lambda_\[FormalLambda] :> TagLambda[lambda, form]
@@ -265,12 +265,29 @@ FunctionLambda[expr_, vars_Association : <||>] := Replace[Unevaluated[expr], {
 }]
 
 
-LambdaTree[lambda_, opts___] := ExpressionTree[
-	TagLambda[lambda] //. (f : Except[Interpretation["\[Lambda]", _]])[x_] :> Application[f, x] //. Interpretation[_, tag_] :> ToString[Unevaluated[tag]],
-	"Heads", opts, Heads -> False, 
-	TreeElementLabel -> TreeCases[Application] -> None, 
-	TreeElementStyle -> {TreeCases[Application] -> LightGray, "Leaves" -> LightYellow, _ -> LightRed}, 
-	TreeElementShapeFunction -> TreeCases[Application] -> None
+Options[LambdaTree] = Join[{"Colored" -> False, "ArgumentLabels" -> True, "ApplicationLabel" -> ""}, Options[Tree]]
+
+LambdaTree[lambda_, opts : OptionsPattern[]] := Block[{colors = <||>},
+	ExpressionTree[
+		ColorizeLambda[lambda] //. (f : Except[Style[Interpretation["\[Lambda]", _], __]])[x_] :> Application[f, x] //. Style[Interpretation[_, tag_], style__] :>
+			With[{node = ToString[Unevaluated[tag]]}, AppendTo[colors, TreeCases[node] -> Directive[style]]; node],
+		"Heads", FilterRules[{opts}, Options[Tree]], Heads -> False, 
+		TreeElementLabelStyle -> If[MatchQ[OptionValue["Colored"], "Labels" | True | Automatic],
+			Normal[colors],
+			{}
+		],
+		TreeElementStyle -> Switch[OptionValue["Colored"],
+			"Elements",
+			Normal[colors],
+			"Labels" | True | Automatic,
+			{All -> White},
+			_,
+			{"Leaves" -> LightYellow, _ -> LightRed}
+		],
+		TreeElementLabel -> TreeCases[Application] -> OptionValue["ApplicationLabel"],
+		TreeElementShapeFunction -> TreeCases[Application] -> None,
+		TreeElementLabelFunction -> If[TrueQ[OptionValue["ArgumentLabels"]], Automatic, {"NonLeaves" -> Function[If[# === Application, OptionValue["ApplicationLabel"], "\[Lambda]"]]}]
+	]
 ]
 
 
@@ -289,7 +306,7 @@ LambdaConvert[expr_, form_String : "Application", args___] := Switch[form,
 	"Application",
 	LambdaApplication[expr],
 	"BracketParens",
-	LmabdaBrackets[expr],
+	LambdaBrackets[expr],
 	"Function",
 	LambdaFunction[expr, args],
 	"Combinator",
@@ -334,36 +351,64 @@ ParseLambda[str_String, form_String : "Variables"] := Switch[form,
 ResourceFunction["AddCodeCompletion"]["ParseLambda"][None, {"Variables", "Indices"}]
 
 
-ColorizeTaggedLambda[lambda_] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
-	lambda /. MapThread[x : #1 | Interpretation[_Integer, Evaluate @ #1[[2]]] :> Style[x, Bold, #2] &, {lambdas, ColorData[109] /@ Range[Length[lambdas]]}]
+ColorizeTaggedLambda[lambda_, colorFunction_ : ColorData[109]] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
+	lambda /. MapThread[x : #1 | Interpretation[_Integer, Evaluate @ #1[[2]]] :> Style[x, Bold, #2] &, {lambdas, colorFunction /@ Range[Length[lambdas]]}]
 ]
 
 
-ColorizeLambda[expr_] := ColorizeTaggedLambda[TagLambda[expr]]
+ColorizeLambda[expr_, args___] := ColorizeTaggedLambda[TagLambda[expr], args]
 
 
 LambdaRow[Interpretation["\[Lambda]", tag_][body_], depth_ : 0] := {{\[FormalLambda][tag] -> depth, Splice[LambdaRow[body, depth + 1]]}}
-LambdaRow[Interpretation[i_Integer, tag_], depth_ : 0] := {i -> tag}
+LambdaRow[Interpretation[i_Integer, tag_], ___] := {i -> tag}
 LambdaRow[(f : Except[Interpretation["\[Lambda]", _]])[(g : Except[Interpretation["\[Lambda]", _]])[x_]], depth_ : 0] := Append[LambdaRow[f, depth], LambdaRow[g[x], depth]]
 LambdaRow[f_[x_], depth_ : 0] := Join[LambdaRow[f, depth], LambdaRow[x, depth]]
-LambdaRow[x_, depth_ : 0] := {x}
+LambdaRow[x_, ___] := {x}
 
-Options[LambdaSmiles] = Join[{"Height" -> 3}, Options[Style], Options[Graphics]];
-LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLambda[lambda]], lambdaPos, varPos, lambdas, vars, colors, arrows, height = OptionValue["Height"], styleOpts = FilterRules[{opts}, Options[Style]]},
-	row = FixedPoint[Replace[#, xs_List :> Splice[{"(", Splice[xs], ")"}], 1] &, row];
+Options[LambdaSmiles] = Join[{"Height" -> 3, "Spacing" -> 1, "StandardForm" -> False, "Arguments" -> False}, Options[Style], Options[Graphics]];
+LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{
+	row = LambdaRow[TagLambda[lambda]],
+	lambdaPos, varPos, argPos, lambdas, vars, args, colors, arrows,
+	height = OptionValue["Height"], spacing = OptionValue["Spacing"],
+	argQ = TrueQ[OptionValue["Arguments"]],
+	styleOpts = FilterRules[{opts}, Options[Style]]
+},
+	row = FixedPoint[
+		Replace[#, xs_List :> Splice[
+				If[
+					TrueQ[OptionValue["StandardForm"]],
+					If[ argQ,
+						If[Length[xs] == 1, {First[xs]}, {First[xs], "[", Replace[First[xs], {(\[FormalLambda][tag_] -> _) :> Splice[{"Arg"[tag] -> 0, ","}], _ -> Nothing}], Rest[xs], "]"}],
+						If[Length[xs] == 1, {First[xs]}, {First[xs], "[", Rest[xs], "]"}]
+					],
+					If[ argQ,
+						If[Length[xs] == 1, {"(", First[xs], ")"}, {First[xs], "(", Replace[First[xs], {(\[FormalLambda][tag_] -> _) :> Splice[{"Arg"[tag] -> 0, ","}], _ -> Nothing}], Splice[Rest[xs]], ")"}],
+						{"(", Splice[xs], ")"}
+					]
+				]
+			],
+			1
+		] &,
+		row
+	];
 	lambdaPos = Position[row, _\[FormalLambda] -> _, {1}, Heads -> False];
 	varPos = Position[row, _Integer -> _, {1}, Heads -> False];
+	argPos = Position[row, "Arg"[_] -> _, {1}, Heads -> False];
 	lambdas = AssociationThread[#[[All, 1, 1]], Thread[First /@ lambdaPos -> #[[All, 2]]]] & @ Extract[row, lambdaPos];
+	args = AssociationThread[#[[All, 1, 1]], Thread[First /@ argPos -> #[[All, 2]]]] & @ Extract[row, argPos];
 	vars = Extract[row, varPos];
 	colors = Association @ MapIndexed[#1[[1, 1]] -> ColorData[109][#2[[1]]] &, Extract[row, lambdaPos]];
-	row = MapAt[Style["\[Lambda]", Lookup[colors, #[[1, 1]], Black]] &, lambdaPos] @ MapAt[Style[#[[1]], Lookup[colors, #[[2]], Black]] &, varPos] @ row;
+	row = row //
+		MapAt[Style["\[Lambda]", Lookup[colors, #[[1, 1]], Black]] &, lambdaPos] //
+		MapAt[Style[#[[If[argQ, 2, 1]]], Lookup[colors, #[[2]], Black]] &, varPos] //
+		MapAt[Style[#[[1, 1]], Lookup[colors, #[[1, 1]], Black]] &, argPos];
 	
-	arrows = MapThread[With[{dh = Ceiling[#1[[1]] / 2], sign = (-1) ^ Boole[EvenQ[#1[[1]]]], l = lambdas[#1[[2]]]},
-		If[MissingQ[l], Nothing, {colors[#1[[2]]], Line[Threaded[{1, sign}] * {{#2, 1}, {#2, 1 + dh / (l[[2]] + 1)}, {l[[1]], 1 + dh / (l[[2]] + 1)}, {l[[1]], 1}}]}]] &,
+	arrows = MapThread[With[{dh = Ceiling[#1[[1]] / 2], sign = (-1) ^ Boole[EvenQ[#1[[1]]]], l = If[argQ, args, lambdas][#1[[2]]]},
+		If[MissingQ[l], Nothing, {colors[#1[[2]]], Line[Threaded[{spacing, sign}] * {{#2, 1}, {#2, 1 + dh / (l[[2]] + 1)}, {l[[1]], 1 + dh / (l[[2]] + 1)}, {l[[1]], 1}}]}]] &,
 		{vars, First /@ varPos}
 	];
 	Graphics[{
-		MapIndexed[Inset[Style[#1, styleOpts, FontSize -> 16], {#2[[1]], 0}] &, row],
+		MapIndexed[Inset[Style[#1, styleOpts, FontSize -> 16], {spacing * #2[[1]], 0}] &, row],
 		arrows
 	},
 		FilterRules[{opts}, Options[Graphics]],
@@ -372,7 +417,7 @@ LambdaSmiles[lambda_, opts : OptionsPattern[]] := Block[{row = LambdaRow[TagLamb
 ]
 
 
-Options[LambdaDiagram] = Join[{"Dynamic" -> False, "Extend" -> False, "Pad" -> True, "Dots" -> True}, Options[Graphics]];
+Options[LambdaDiagram] = Join[{"Dynamic" -> False, "Extend" -> False, "Pad" -> True, "Dots" -> All}, Options[Graphics]];
 
 LambdaDiagram[expr_, depths_Association, extend_ ? BooleanQ, pad_ ? BooleanQ, pos_List : {}] := Block[{
 	w, h, lines, dh = Max[depths, -1] + Which[! extend && ! pad, 2, ! pad, 1, True, 0]
@@ -444,15 +489,22 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 			Identity
 		] @ expr
 	],
-	lambda = TagLambda[expr], depths, dots
+	lambda = TagLambda[expr], depths, lines, dots
 },
 	depths = Association @ Reap[LambdaDepths[lambda]][[2]];
 	lines = LambdaDiagram[lambda, depths, TrueQ[OptionValue["Extend"]], TrueQ[OptionValue["Pad"]]][[2]];
-	dots = If[TrueQ[OptionValue["Dots"]],
+	dots = Switch[OptionValue["Dots"],
+		All,
 		{
 			PointSize[Large],
 			Cases[lines, Labeled[{{x_, _}, y_}, pos_ -> type_] :> Tooltip[Point[{x, y}], makeTooltip[pos, type]]]
 		},
+		True | Automatic,
+		{
+			PointSize[Large],
+			Cases[lines, Labeled[{{x_, _}, y_}, pos_ -> "Lambda"] :> Tooltip[Point[{x, y}], makeTooltip[pos, "Lambda"]]]
+		},
+		False | None,
 		Nothing
 	];
 	If[ TrueQ[OptionValue["Dynamic"]]
@@ -464,11 +516,11 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 				Graphics[{
 					MapIndexed[With[{i = #2[[1]]},
 						Replace[#1, Labeled[line_, pos_ -> type_] :> With[{
-							primitive = Tooltip[Dynamic @ {style[[i]], Line[Thread[line]]}, makeTooltip[pos, type]]
+							primitive = Tooltip[Dynamic @ {If[type === "LambdaApplication", Directive[Dashed, AbsoluteThickness[3]], Nothing], style[[i]], Line[Thread[line]]}, makeTooltip[pos, type]]
 						},
 							EventHandler[primitive,
 								{
-									"MouseEntered" :> (style[[i]] = If[type === "LambdaApplication", Directive[Dashed, AbsoluteThickness[3]], Thickness[Large]]),
+									"MouseEntered" :> (style[[i]] = Thickness[Large]),
 									"MouseExited" :> (style[[i]] = Thickness[Medium]),
 									If[	type === "LambdaApplication",
 										"MouseClicked" :> MathLink`CallFrontEnd[FrontEnd`BoxReferenceReplace[FE`BoxReference[EvaluationNotebook[], boxId],
