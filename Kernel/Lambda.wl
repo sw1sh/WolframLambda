@@ -492,7 +492,10 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 	lambda = TagLambda[expr], depths, lines, dots
 },
 	depths = Association @ Reap[LambdaDepths[lambda]][[2]];
-	lines = LambdaDiagram[lambda, depths, TrueQ[OptionValue["Extend"]], TrueQ[OptionValue["Pad"]]][[2]];
+	lines = SortBy[
+		LambdaDiagram[lambda, depths, TrueQ[OptionValue["Extend"]], TrueQ[OptionValue["Pad"]]][[2]],
+		MatchQ[Labeled[{{_, _}, _}, _ -> "LambdaApplication"]]
+	];
 	dots = Switch[OptionValue["Dots"],
 		All,
 		{
@@ -510,9 +513,7 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 	If[ TrueQ[OptionValue["Dynamic"]]
 		,
 		With[{boxId = Unique[Symbol["LambdaDiagram"]]},
-			DynamicModule[{style},
-				lines = SortBy[lines, MatchQ[Labeled[{{_, _}, _}, _ -> "LambdaApplication"]]];
-				style = ConstantArray[Thickness[Medium], Length[lines]];
+			DynamicModule[{style = ConstantArray[Thickness[Medium], Length[lines]]},
 				Graphics[{
 					MapIndexed[With[{i = #2[[1]]},
 						Replace[#1, Labeled[line_, pos_ -> type_] :> With[{
@@ -520,8 +521,8 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 						},
 							EventHandler[primitive,
 								{
-									"MouseEntered" :> (style[[i]] = Thickness[Large]),
-									"MouseExited" :> (style[[i]] = Thickness[Medium]),
+									"MouseEntered" :> If[ListQ[style], style[[i]] = Thickness[Large]],
+									"MouseExited" :> If[ListQ[style], style[[i]] = Thickness[Medium]],
 									If[	type === "LambdaApplication",
 										"MouseClicked" :> MathLink`CallFrontEnd[FrontEnd`BoxReferenceReplace[FE`BoxReference[EvaluationNotebook[], boxId],
 											ToBoxes[LambdaDiagram[MapAt[BetaReduce[#, 1] &, expr, {pos}], opts]]]
@@ -538,7 +539,6 @@ LambdaDiagram[expr_, opts : OptionsPattern[]] := Block[{
 					FilterRules[{opts}, Options[Graphics]],
 					PlotLabel :> ClickToCopy[expr, expr]
 				],
-
 				BoxID -> boxId
 			]
 		]
