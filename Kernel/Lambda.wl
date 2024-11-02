@@ -36,6 +36,8 @@ FunctionLambda;
 LambdaTree;
 LambdaConvert;
 ParseLambda;
+LambdaBLC;
+BLCLambda;
 
 TagLambda;
 ColorizeLambda;
@@ -315,10 +317,12 @@ LambdaConvert[expr_, form_String : "Application", args___] := Switch[form,
 	LambdaTree[expr, args],
 	"String",
 	LambdaString[expr, args],
+	"BLC",
+	LambdaBLC[expr, args],
 	_,
 	Missing[form]
 ]
-ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Combinator", "Tree", "String"}]
+ResourceFunction["AddCodeCompletion"]["LambdaConvert"][None, {"Application", "BracketParens", "Function", "Combinator", "Tree", "String", "BLC"}]
 
 
 BalancedParenthesesQ[str_] := FixedPoint[StringDelete["()"], StringDelete[str, Except["(" | ")"]]] === ""
@@ -349,6 +353,34 @@ ParseLambda[str_String, form_String : "Variables"] := Switch[form,
 ]
 
 ResourceFunction["AddCodeCompletion"]["ParseLambda"][None, {"Variables", "Indices"}]
+
+
+LambdaBLC[lambda_, ___] := lambda /. {
+	\[FormalLambda][body_] :> {0, 0, Splice[LambdaBLC[body]]},
+	f_[x_] :> {0, 1, Splice[LambdaBLC[f]], Splice[LambdaBLC[x]]},
+	i_Integer :> Append[ConstantArray[1, i], 0]
+}
+
+blcLambda[bits : {___Integer}] :=
+	Replace[bits, {
+		{0, 0, body___} :> ({\[FormalLambda][#1], #2} & @@ blcLambda[{body}]),
+		{0, 1, fx___} :> (({f, xs} |-> ({f[#1], #2} & @@ blcLambda[xs])) @@ blcLambda[{fx}]),
+		{var : (1 ..), 0, rest___} :> {Length[{var}], {rest}},
+		{} -> {None, {}},
+		_ -> {Missing["UnrecognizedBits", bits], {}}
+	}]
+
+BLCLambda[bits : {___Integer}] := First[blcLambda[bits]]
+
+BLCLambda[ba_ByteArray] := BLCLambda[Catenate[Reverse /@ IntegerDigits[Normal[ba], 2]]]
+
+BLCLambda[n_Integer] := BLCLambda[ByteArray[{n}]]
+
+BLCLambda[s_String] := BLCLambda[StringToByteArray[s]]
+
+BLCLambda[ds_DataStructure] /; DataStructureQ[ds, "BitVector"] := BLCLambda[Boole[Normal[ds]]]
+
+BLCLambda[expr_] := BLCLambda[BinarySerialize[expr]]
 
 
 ColorizeTaggedLambda[lambda_, colorFunction_ : ColorData[109]] := With[{lambdas = Cases[lambda, Interpretation["\[Lambda]", x_], All, Heads -> True]},
